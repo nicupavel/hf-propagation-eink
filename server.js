@@ -71,7 +71,6 @@ async function parseSolarXml() {
 }
 
 // Render json data onto a canvas
-// Render json data onto a canvas
 async function renderSolarCanvas(data) {
     const width = 800;
     const height = 480;
@@ -121,21 +120,71 @@ async function renderSolarCanvas(data) {
     context.strokeStyle = colors.separator;
     context.lineWidth = 2;
     context.beginPath();
-    context.moveTo(20, 95);
-    context.lineTo(width - 20, 95);
+    context.moveTo(20, 85);
+    context.lineTo(width - 20, 85);
     context.stroke();
 
-    // Draw data rows
+    // Draw data rows in three columns
     context.font = '20px Courier New';
-    context.fillStyle = colors.text;
+
+    const col1X = 20;
+    const col2X = 210;
+    const col3X = 600;
+
     let yPos = 125;
-    context.fillText(`SFI: ${data.solarflux}   Sunspots: ${data.sunspots}   X-Ray: ${data.xray}   Aurora: ${data.aurora}`, 20, yPos);
+    
+    context.fillStyle = colors.subtitle;
+    context.fillText(`SFI: `, col1X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.solarflux}`, col1X + 60, yPos);
+    
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Sunspots: `, col2X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.sunspots}`, col2X + 120, yPos);
+
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Noise: `, col3X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.signalnoise}`, col3X + 90, yPos);
+    
     yPos += 30;
-    context.fillText(`Solar Wind: ${data.solarwind} km/s  Kp: ${data.kindex}   Bz: ${data.magneticfield} nT `, 20, yPos);
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Kp: `, col1X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.kindex}`, col1X + 50, yPos);
+    
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Solar Wind: `, col2X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.solarwind} km/s`, col2X + 140, yPos);
+
+    context.fillStyle = colors.subtitle;
+    context.fillText(`X-Ray: `, col3X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.xray}`, col3X + 80, yPos);
+
     yPos += 30;
-    context.fillText(`Proton Flux: ${data.protonflux}  Geomagnetic Field: ${data.geomagfield}`, 20, yPos);
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Aurora: `, col1X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.aurora}`, col1X + 100, yPos);
+
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Proton Flux: `, col2X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.protonflux}`, col2X + 160, yPos);
+
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Bz: `, col3X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.magneticfield} nT`, col3X + 50, yPos);
+    
     yPos += 30;
-    context.fillText(`Noise: ${data.signalnoise}`, 20, yPos);
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Geomagnetic Field: `, col2X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.geomagfield}`, col2X + 230, yPos);
 
 
     // Draw separator line
@@ -145,7 +194,7 @@ async function renderSolarCanvas(data) {
     context.stroke();
 
 
-    yPos += 60;
+    yPos += 70;
     // Draw HF Band Conditions
     context.font = 'bold 22px Courier New';
     context.fillStyle = colors.title;
@@ -153,9 +202,9 @@ async function renderSolarCanvas(data) {
 
     context.font = '20px Courier New';
     context.fillStyle = colors.subtitle;
-    context.fillText('Band      Day      Night', 20, yPos + 35);
+    context.fillText('Band       Day       Night', 20, yPos + 30);
 
-    yPos += 70;
+    yPos += 60;
     Object.entries(data.calculatedconditions).forEach(([key, value]) => {
         const dayCondition = value['day'] || 'N/A';
         const nightCondition = value['night'] || 'N/A';
@@ -164,23 +213,23 @@ async function renderSolarCanvas(data) {
         context.fillText(`${key}:`, 20, yPos);
         
         context.fillStyle = setConditionColor(dayCondition);
-        context.fillText(dayCondition, 120, yPos);
+        context.fillText(dayCondition, 150, yPos);
         
         context.fillStyle = setConditionColor(nightCondition);
         context.fillText(nightCondition, 270, yPos);
 
-        yPos += 30;
+        yPos += 35;
     });
 
     let vhfXPos = width / 2 + 80;
-    let vhfYPos = yPos - (Object.keys(data.calculatedconditions).length * 30) - 70;
+    let vhfYPos = 285;
     // Draw VHF / EME Conditions
     context.font = 'bold 22px Courier New';
     context.fillStyle = colors.title;
     context.fillText('VHF / EME Conditions', vhfXPos, vhfYPos);
     
     context.font = '20px Courier New';
-    vhfYPos += 35;
+    vhfYPos += 30;
 
 
     const vhfConditions = [
@@ -198,7 +247,7 @@ async function renderSolarCanvas(data) {
 
         context.fillStyle = setConditionColor(value);
         context.fillText(value.trim(), vhfXPos + 120, vhfYPos);
-        vhfYPos += 30;
+        vhfYPos += 34;
     });
 
     return canvas.toBuffer('image/png');
