@@ -71,61 +71,135 @@ async function parseSolarXml() {
 }
 
 // Render json data onto a canvas
+// Render json data onto a canvas
 async function renderSolarCanvas(data) {
     const width = 800;
     const height = 480;
     const canvas = createCanvas(width, height);
     const context = canvas.getContext('2d');
 
+    // Define colors
+    const colors = {
+        background: '#000000',
+        title: '#cccccc',
+        subtitle: '#aaaaaa',
+        text: '#ffffff',
+        separator: '#555555',
+        good: '#00ff00',
+        fair: '#ffff00',
+        poor: '#ff0000'
+    };
+
+    // Helper function to set fill style based on condition
+    const setConditionColor = (condition) => {
+        if (condition.toLowerCase().includes('good')) return colors.good;
+        if (condition.toLowerCase().includes('fair')) return colors.fair;
+        if (condition.toLowerCase().includes('poor')) return colors.poor;
+        if (condition.toLowerCase().includes('closed')) return colors.poor;
+        return colors.text;
+    };
+
     // Set background color
-    context.fillStyle = '#000000';
+    context.fillStyle = colors.background;
     context.fillRect(0, 0, width, height);
 
     // Set font styles
-    context.font = '24px Courier New';
-    context.fillStyle = '#ffffff';
+    context.font = '22px Courier New';
+    context.fillStyle = colors.text;
 
     // Draw header
     context.font = 'bold 24px Courier New';
-    context.fillText('Solar Terrestrial Data — ' + new Date().toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', timeZoneName: 'short' }), 20, 40);
-    context.font = '24px Courier New'; // Reset font
+    context.fillStyle = colors.title;
+    context.fillText('Solar Terrestrial Data', 20, 40);
+
+    // Draw subtitle
+    context.font = '18px Courier New';
+    context.fillStyle = colors.subtitle;
+    context.fillText(new Date().toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', timeZoneName: 'short' }), 20, 70);
 
     // Draw separator line
-    context.strokeStyle = '#ffffff';
+    context.strokeStyle = colors.separator;
     context.lineWidth = 2;
     context.beginPath();
-    context.moveTo(20, 60);
-    context.lineTo(width - 20, 60);
+    context.moveTo(20, 95);
+    context.lineTo(width - 20, 95);
     context.stroke();
 
     // Draw data rows
-    context.fillText(`SFI: ${data.solarflux}   Sunspots: ${data.sunspots}   X-Ray: ${data.xray}   Aurora: ${data.aurora}`, 20, 90);
-    context.fillText(`Solar Wind: ${data.solarwind} km/s  Kp: ${data.kindex}   Bz: ${data.magneticfield} nT `, 20, 120);
-    context.fillText(`Proton Flux: ${data.protonflux}  Geomagnetic Field: ${data.geomagfield}`, 20, 150);
-    context.fillText(`Noise: ${data.signalnoise}`, 20, 180);
+    context.font = '20px Courier New';
+    context.fillStyle = colors.text;
+    let yPos = 125;
+    context.fillText(`SFI: ${data.solarflux}   Sunspots: ${data.sunspots}   X-Ray: ${data.xray}   Aurora: ${data.aurora}`, 20, yPos);
+    yPos += 30;
+    context.fillText(`Solar Wind: ${data.solarwind} km/s  Kp: ${data.kindex}   Bz: ${data.magneticfield} nT `, 20, yPos);
+    yPos += 30;
+    context.fillText(`Proton Flux: ${data.protonflux}  Geomagnetic Field: ${data.geomagfield}`, 20, yPos);
+    yPos += 30;
+    context.fillText(`Noise: ${data.signalnoise}`, 20, yPos);
+
 
     // Draw separator line
     context.beginPath();
-    context.moveTo(20, 200);
-    context.lineTo(width - 20, 200);
+    context.moveTo(20, yPos + 25);
+    context.lineTo(width - 20, yPos + 25);
     context.stroke();
 
-    // Draw HF Band Conditions    
-    context.fillText('HF Band Conditions', 20, 230);
-    context.fillText('Band     Day    Night', 20, 265);
-    let linePos = 300
+
+    yPos += 60;
+    // Draw HF Band Conditions
+    context.font = 'bold 22px Courier New';
+    context.fillStyle = colors.title;
+    context.fillText('HF Band Conditions', 20, yPos);
+
+    context.font = '20px Courier New';
+    context.fillStyle = colors.subtitle;
+    context.fillText('Band      Day      Night', 20, yPos + 35);
+
+    yPos += 70;
     Object.entries(data.calculatedconditions).forEach(([key, value]) => {
-        context.fillText(`${key}: ${value['day'] || 'N/A'}   ${value['night'] || 'N/A'}`, 20, linePos);
-        linePos += 35;
+        const dayCondition = value['day'] || 'N/A';
+        const nightCondition = value['night'] || 'N/A';
+        
+        context.fillStyle = colors.text;
+        context.fillText(`${key}:`, 20, yPos);
+        
+        context.fillStyle = setConditionColor(dayCondition);
+        context.fillText(dayCondition, 120, yPos);
+        
+        context.fillStyle = setConditionColor(nightCondition);
+        context.fillText(nightCondition, 270, yPos);
+
+        yPos += 30;
     });
-    
+
+    let vhfXPos = width / 2 + 80;
+    let vhfYPos = yPos - (Object.keys(data.calculatedconditions).length * 30) - 70;
     // Draw VHF / EME Conditions
-    context.fillText('VHF / EME Conditions', width / 2 + 50, 230);
-    context.fillText('Aurora:  ' + (data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A'), width / 2 + 50, 265);
-    context.fillText('6m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe_6m'] || 'N/A'), width / 2 + 50, 300);
-    context.fillText('4m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe_4m']  || 'N/A'), width / 2 + 50, 335);
-    context.fillText('2m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe']  || 'N/A'), width / 2 + 50, 370);
-    context.fillText('2m EsNA: ' + (data.calculatedvhfconditions?.['E-Skip']?.['north_america']  || 'N/A'), width / 2 + 50, 405);
+    context.font = 'bold 22px Courier New';
+    context.fillStyle = colors.title;
+    context.fillText('VHF / EME Conditions', vhfXPos, vhfYPos);
+    
+    context.font = '20px Courier New';
+    vhfYPos += 35;
+
+
+    const vhfConditions = [
+        `Aurora:  ${data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A'}`,
+        `6m EsEU: ${data.calculatedvhfconditions?.['E-Skip']?.['europe_6m'] || 'N/A'}`,
+        `4m EsEU: ${data.calculatedvhfconditions?.['E-Skip']?.['europe_4m']  || 'N/A'}`,
+        `2m EsEU: ${data.calculatedvhfconditions?.['E-Skip']?.['europe']  || 'N/A'}`,
+        `2m EsNA: ${data.calculatedvhfconditions?.['E-Skip']?.['north_america']  || 'N/A'}`,
+    ];
+
+    vhfConditions.forEach(condition => {
+        const [label, value] = condition.split(':');
+        context.fillStyle = colors.subtitle;
+        context.fillText(label + ':', vhfXPos, vhfYPos);
+
+        context.fillStyle = setConditionColor(value);
+        context.fillText(value.trim(), vhfXPos + 120, vhfYPos);
+        vhfYPos += 30;
+    });
 
     return canvas.toBuffer('image/png');
 }
