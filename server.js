@@ -3,7 +3,7 @@ const xml2js = require('xml2js');
 const { createCanvas, loadImage } = require('canvas');
 
 const app = express();
-const port = 3000;
+const port = 5000;
 
 const xmlParser = new xml2js.Parser();
 
@@ -82,13 +82,13 @@ async function renderSolarCanvas(data) {
     context.fillRect(0, 0, width, height);
 
     // Set font styles
-    context.font = '16px Arial';
+    context.font = '24px Courier New';
     context.fillStyle = '#ffffff';
 
     // Draw header
-    context.font = 'bold 20px Arial';
+    context.font = 'bold 24px Courier New';
     context.fillText('Solar Terrestrial Data — ' + new Date().toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', timeZoneName: 'short' }), 20, 40);
-    context.font = '16px Arial'; // Reset font
+    context.font = '24px Courier New'; // Reset font
 
     // Draw separator line
     context.strokeStyle = '#ffffff';
@@ -99,32 +99,33 @@ async function renderSolarCanvas(data) {
     context.stroke();
 
     // Draw data rows
-    context.fillText(`SFI: ${data.solarflux}   Sunspots: ${data.sunspots}   X-Ray: ${data.xray}   Aurora: ${data.aurora}   Kp: ${data.kindex}`, 20, 90);
-    context.fillText(`Solar Wind: ${data.solarwind} km/s    Bz: ${data.magneticfield} nT   Proton Flux: ${data.protonflux}`, 20, 120);
-    context.fillText(`Geomagnetic Field: ${data.geomagfield}     Noise: ${data.signalnoise}`, 20, 150);
+    context.fillText(`SFI: ${data.solarflux}   Sunspots: ${data.sunspots}   X-Ray: ${data.xray}   Aurora: ${data.aurora}`, 20, 90);
+    context.fillText(`Solar Wind: ${data.solarwind} km/s  Kp: ${data.kindex}   Bz: ${data.magneticfield} nT `, 20, 120);
+    context.fillText(`Proton Flux: ${data.protonflux}  Geomagnetic Field: ${data.geomagfield}`, 20, 150);
+    context.fillText(`Noise: ${data.signalnoise}`, 20, 180);
 
     // Draw separator line
     context.beginPath();
-    context.moveTo(20, 170);
-    context.lineTo(width - 20, 170);
+    context.moveTo(20, 200);
+    context.lineTo(width - 20, 200);
     context.stroke();
 
     // Draw HF Band Conditions    
-    context.fillText('HF Band Conditions', 20, 200);
-    context.fillText('Day        Night', 20, 220);
-    let linePos = 240
+    context.fillText('HF Band Conditions', 20, 230);
+    context.fillText('Band     Day    Night', 20, 265);
+    let linePos = 300
     Object.entries(data.calculatedconditions).forEach(([key, value]) => {
         context.fillText(`${key}: ${value['day'] || 'N/A'}   ${value['night'] || 'N/A'}`, 20, linePos);
-        linePos += 20;
+        linePos += 35;
     });
     
     // Draw VHF / EME Conditions
-    context.fillText('VHF / EME Conditions', width / 2 + 50, 200);
-    context.fillText('Aurora: ' + (data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A'), width / 2 + 50, 220);
-    context.fillText('6m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe_6m'] || 'N/A'), width / 2 + 50, 240);
-    context.fillText('4m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe_4m']  || 'N/A'), width / 2 + 50, 260);
-    context.fillText('2m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe']  || 'N/A'), width / 2 + 50, 280);
-    context.fillText('2m EsNA: ' + (data.calculatedvhfconditions?.['E-Skip']?.['north_america']  || 'N/A'), width / 2 + 50, 300);
+    context.fillText('VHF / EME Conditions', width / 2 + 50, 230);
+    context.fillText('Aurora:  ' + (data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A'), width / 2 + 50, 265);
+    context.fillText('6m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe_6m'] || 'N/A'), width / 2 + 50, 300);
+    context.fillText('4m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe_4m']  || 'N/A'), width / 2 + 50, 335);
+    context.fillText('2m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe']  || 'N/A'), width / 2 + 50, 370);
+    context.fillText('2m EsNA: ' + (data.calculatedvhfconditions?.['E-Skip']?.['north_america']  || 'N/A'), width / 2 + 50, 405);
 
     return canvas.toBuffer('image/png');
 }
@@ -154,7 +155,7 @@ app.get('/solar/canvas', async (req, res) => {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Solar Terrestrial Data</title>
                 <style>
-                    body { background-color: #282c34; color: #ffffff; font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                    body { background-color: #282c34; color: #ffffff; font-family: Courier New, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
                     img { border: 2px solid #ffffff; }
                 </style>
             </head>
@@ -180,6 +181,10 @@ app.get('/solar/png', async (req, res) => {
         console.error('Error generating PNG:', error);
         res.status(500).send('Error generating solar data PNG.');
     }
+});
+
+app.get('/', (req, res) => {
+    res.redirect('/solar/canvas');
 });
 
 app.listen(port, () => {
