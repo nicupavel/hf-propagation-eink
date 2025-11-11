@@ -4,6 +4,8 @@ Displays solar-terrestrial HF propagation data as an image (or html canvas) for 
 
 The server can be run using Docker. After building the image and starting the containers with `run.sh`, the following endpoints are available:
 
+<img width="800" height="480" alt="image" src="https://github.com/user-attachments/assets/60aa698b-aa36-44da-aa8d-cbfd632a7f93" />
+
 ## Endpoints
 
 *   **/solar/json**: Returns the solar-terrestrial data in JSON format.
