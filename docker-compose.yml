@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  solar-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_VERSION: 22 
+    ports:
+      - "3000:3000" 
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
