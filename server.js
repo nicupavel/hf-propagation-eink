@@ -11,8 +11,9 @@ const defaultSettings = {
     invert: 0,
     width: 800,
     height: 480,
-    fontSizeNormal: 22,
-    fontSizeLarge: 24,
+    fontSizeSmall: 18,
+    fontSizeNormal: 20,
+    fontSizeLarge: 20,
 };
 
 const settings = { ...defaultSettings };
@@ -144,6 +145,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     };
 
     const colors = settings.invert ? theme.invert : theme.normal;
+    settings.fontSizeSmall = (defaultSettings.fontSizeSmall * settings.height) / defaultSettings.height;
     settings.fontSizeNormal = (defaultSettings.fontSizeNormal * settings.height) / defaultSettings.height;
     settings.fontSizeLarge = (defaultSettings.fontSizeLarge * settings.height) / defaultSettings.height;
 
@@ -151,10 +153,11 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
         if (settings.mode == 0 ) return colors.text;
 
         if (condition.toLowerCase().includes('good')) return colors.good;
+        if (condition.toLowerCase().includes('mid lat aur')) return colors.good;
         if (condition.toLowerCase().includes('fair')) return colors.fair;
         if (condition.toLowerCase().includes('poor')) return colors.poor;
         if (condition.toLowerCase().includes('closed')) return colors.poor;
-        return colors.text;
+         return colors.text;
     };
 
     // Set background color
@@ -171,7 +174,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     context.fillText('Solar Terrestrial Data', 20, 40);
 
     // Draw subtitle
-    context.font = '18px Courier New';
+    context.font = '${settings.fontSizeSmall}px Courier New';
     context.fillStyle = colors.subtitle;
     context.fillText(new Date().toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', timeZoneName: 'short' }), 20, 70);
 
@@ -184,66 +187,76 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     context.stroke();
 
     // Draw data rows in three columns
-    context.font = '20px Courier New';
+    context.font = '${settings.fontSizeNormal}px Courier New';
 
     const col1X = 20;
     const col2X = 210;
-    const col3X = 600;
+    const col3X = 500;
 
     let yPos = 125;
     
     context.fillStyle = colors.subtitle;
-    context.fillText(`SFI: `, col1X, yPos);
+    context.fillText(`SFI:`, col1X, yPos);
     context.fillStyle = colors.text;
     context.fillText(`${data.solarflux}`, col1X + 60, yPos);
     
     context.fillStyle = colors.subtitle;
-    context.fillText(`Sunspots: `, col2X, yPos);
+    context.fillText(`Sunspots:`, col2X, yPos);
     context.fillStyle = colors.text;
     context.fillText(`${data.sunspots}`, col2X + 120, yPos);
 
     context.fillStyle = colors.subtitle;
-    context.fillText(`Noise: `, col3X, yPos);
+    context.fillText(`Sig Noise:`, col3X, yPos);
     context.fillStyle = colors.text;
-    context.fillText(`${data.signalnoise}`, col3X + 90, yPos);
+    context.fillText(`${data.signalnoise}`, col3X + 130, yPos);
     
     yPos += 30;
     context.fillStyle = colors.subtitle;
-    context.fillText(`Kp: `, col1X, yPos);
+    context.fillText(`K Index:`, col1X, yPos);
     context.fillStyle = colors.text;
-    context.fillText(`${data.kindex}`, col1X + 50, yPos);
+    context.fillText(`${data.kindex}`, col1X + 100, yPos);
     
     context.fillStyle = colors.subtitle;
-    context.fillText(`Solar Wind: `, col2X, yPos);
+    context.fillText(`Solar Wind:`, col2X, yPos);
     context.fillStyle = colors.text;
     context.fillText(`${data.solarwind} km/s`, col2X + 140, yPos);
 
     context.fillStyle = colors.subtitle;
-    context.fillText(`X-Ray: `, col3X, yPos);
+    context.fillText(`X-Ray:`, col3X, yPos);
     context.fillStyle = colors.text;
     context.fillText(`${data.xray}`, col3X + 80, yPos);
 
     yPos += 30;
     context.fillStyle = colors.subtitle;
-    context.fillText(`Aurora: `, col1X, yPos);
+    context.fillText(`Aurora:`, col1X, yPos);
     context.fillStyle = colors.text;
     context.fillText(`${data.aurora}`, col1X + 100, yPos);
 
     context.fillStyle = colors.subtitle;
-    context.fillText(`Proton Flux: `, col2X, yPos);
+    context.fillText(`Proton Flux:`, col2X, yPos);
     context.fillStyle = colors.text;
     context.fillText(`${data.protonflux}`, col2X + 160, yPos);
 
     context.fillStyle = colors.subtitle;
-    context.fillText(`Bz: `, col3X, yPos);
+    context.fillText(`Helium Line:`, col3X, yPos);
     context.fillStyle = colors.text;
-    context.fillText(`${data.magneticfield} nT`, col3X + 50, yPos);
+    context.fillText(`${data.heliumline}`, col3X + 150, yPos);
     
     yPos += 30;
     context.fillStyle = colors.subtitle;
-    context.fillText(`Geomagnetic Field: `, col2X, yPos);
+    context.fillText(`Mag Fld:`, col1X, yPos);
     context.fillStyle = colors.text;
-    context.fillText(`${data.geomagfield}`, col2X + 230, yPos);
+    context.fillText(`${data.magneticfield}`, col1X + 100, yPos);
+
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Geo Fld:`, col2X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.geomagfield}`, col2X + 110, yPos);
+
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Lat Deg:`, col3X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.latdegree}`, col3X + 100, yPos);
 
 
     // Draw separator line
@@ -255,39 +268,39 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
 
     yPos += 70;
     // Draw HF Band Conditions
-    context.font = 'bold 22px Courier New';
+    context.font = 'bold ${settings.fontSizeLarge}px Courier New';
     context.fillStyle = colors.title;
     context.fillText('HF Band Conditions', 20, yPos);
 
-    context.font = '20px Courier New';
+    context.font = '${settings.fontSizeNormal}px Courier New';
     context.fillStyle = colors.subtitle;
-    context.fillText('Band       Day       Night', 20, yPos + 30);
+    context.fillText('Band     Day   Night', 20, yPos + 30);
 
     yPos += 60;
     Object.entries(data.calculatedconditions).forEach(([key, value]) => {
         const dayCondition = value['day'] || 'N/A';
         const nightCondition = value['night'] || 'N/A';
         
-        context.fillStyle = colors.text;
+        context.fillStyle = colors.subtitle;
         context.fillText(`${key}:`, 20, yPos);
         
         context.fillStyle = setConditionColor(dayCondition);
-        context.fillText(dayCondition, 150, yPos);
+        context.fillText(dayCondition, 126, yPos);
         
         context.fillStyle = setConditionColor(nightCondition);
-        context.fillText(nightCondition, 270, yPos);
+        context.fillText(nightCondition, 198, yPos);
 
         yPos += 35;
     });
 
-    let vhfXPos = settings.width / 2 + 80;
+    let vhfXPos = settings.width / 2 - 100;
     let vhfYPos = 285;
     // Draw VHF / EME Conditions
-    context.font = 'bold 22px Courier New';
+    context.font = 'bold ${settings.fontSizeLarge}px Courier New';
     context.fillStyle = colors.title;
     context.fillText('VHF / EME Conditions', vhfXPos, vhfYPos);
     
-    context.font = '20px Courier New';
+    context.font = '${settings.fontSizeNormal}px Courier New';
     vhfYPos += 30;
 
     const vhfConditions = [
@@ -307,6 +320,50 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
         context.fillText(value.trim(), vhfXPos + 120, vhfYPos);
         vhfYPos += 34;
     });
+
+    let LasthfXPos = settings.width / 2 + 180;
+    let LasthfYPos = 285;
+
+    function drawSegment(ctx, text, color, x, y) {
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+    const width = ctx.measureText(text).width;
+    return x + width;
+}
+
+    const LINE_HEIGHT = 30;
+
+    // Set the initial positions
+    let currentXPos = LasthfXPos;
+    let currentYPos = LasthfYPos;
+
+    // --- LINE 1: MUF ---
+    currentXPos = drawSegment(context, 'MUF: ', colors.subtitle, currentXPos, currentYPos);
+    currentXPos = drawSegment(context, `${data.muf}`, colors.text, currentXPos, currentYPos);
+
+    // --- START NEW LINE ---
+    currentXPos = LasthfXPos;
+    currentYPos += LINE_HEIGHT; 
+
+    // --- LINE 2: Norm ---
+    currentXPos = drawSegment(context, 'Norm: ', colors.subtitle, currentXPos, currentYPos);
+    currentXPos = drawSegment(context, `${data.normalization}`, colors.text, currentXPos, currentYPos);
+
+    // --- START NEW LINE ---
+    currentXPos = LasthfXPos;
+    currentYPos += LINE_HEIGHT; 
+
+    // --- LINE 3: A Index ---
+    currentXPos = drawSegment(context, 'A Index: ', colors.subtitle, currentXPos, currentYPos);
+    currentXPos = drawSegment(context, `${data.aindex}`, colors.text, currentXPos, currentYPos);
+
+    // --- START NEW LINE ---
+    currentXPos = LasthfXPos;
+    currentYPos += LINE_HEIGHT; 
+
+    // --- LINE 4: Elec Flx ---
+    currentXPos = drawSegment(context, 'Elec Flx: ', colors.subtitle, currentXPos, currentYPos);
+    currentXPos = drawSegment(context, `${data.electonflux}`, colors.text, currentXPos, currentYPos);
 
     return canvas.toBuffer('image/png');
 }
