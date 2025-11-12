@@ -3,7 +3,7 @@ const xml2js = require('xml2js');
 const { createCanvas, loadImage } = require('canvas');
 
 const app = express();
-const port = 5000;
+const port = 3000;
 
 const xmlParser = new xml2js.Parser();
 
@@ -46,7 +46,9 @@ async function parseSolarXml() {
             magneticfield: parseFloat(solardata.magneticfield[0]),
             geomagfield: solardata.geomagfield[0],
             signalnoise: solardata.signalnoise[0],
+            fof2: solardata.fof2[0],
             muf: solardata.muf[0],
+            muffactor: solardata.muffactor[0],
             calculatedconditions: solardata.calculatedconditions[0].band.reduce(
                 (acc, { _, $: { name, time } }) => {
                     acc[name] = acc[name] || {};
@@ -62,7 +64,6 @@ async function parseSolarXml() {
                 }, {}
            ),
         };
-
         return parsedJson;
     } catch (error) {
         console.error('Error fetching or parsing XML:', error);
@@ -71,11 +72,13 @@ async function parseSolarXml() {
 }
 
 // Render json data onto a canvas
-async function renderSolarCanvas(data) {
+async function renderSolarCanvas(data, mode) {
     const width = 800;
     const height = 480;
     const canvas = createCanvas(width, height);
     const context = canvas.getContext('2d');
+
+    mode = mode ?? 0;
 
     // Define colors
     const colors = {
@@ -89,8 +92,9 @@ async function renderSolarCanvas(data) {
         poor: '#ff0000'
     };
 
-    // Helper function to set fill style based on condition
     const setConditionColor = (condition) => {
+        if (mode == 0 ) return colors.text;
+
         if (condition.toLowerCase().includes('good')) return colors.good;
         if (condition.toLowerCase().includes('fair')) return colors.fair;
         if (condition.toLowerCase().includes('poor')) return colors.poor;
@@ -231,17 +235,16 @@ async function renderSolarCanvas(data) {
     context.font = '20px Courier New';
     vhfYPos += 30;
 
-
     const vhfConditions = [
-        `Aurora:  ${data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A'}`,
-        `6m EsEU: ${data.calculatedvhfconditions?.['E-Skip']?.['europe_6m'] || 'N/A'}`,
-        `4m EsEU: ${data.calculatedvhfconditions?.['E-Skip']?.['europe_4m']  || 'N/A'}`,
-        `2m EsEU: ${data.calculatedvhfconditions?.['E-Skip']?.['europe']  || 'N/A'}`,
-        `2m EsNA: ${data.calculatedvhfconditions?.['E-Skip']?.['north_america']  || 'N/A'}`,
+        { 'Aurora':  data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A' },
+        { '6m EsEU': data.calculatedvhfconditions?.['E-Skip']?.['europe_6m'] || 'N/A' },
+        { '4m EsEU': data.calculatedvhfconditions?.['E-Skip']?.['europe_4m']  || 'N/A'},
+        { '2m EsEU': data.calculatedvhfconditions?.['E-Skip']?.['europe']  || 'N/A' },
+        { '2m EsNA': data.calculatedvhfconditions?.['E-Skip']?.['north_america']  || 'N/A' },
     ];
 
     vhfConditions.forEach(condition => {
-        const [label, value] = condition.split(':');
+        const [[label, value]] = Object.entries(condition);
         context.fillStyle = colors.subtitle;
         context.fillText(label + ':', vhfXPos, vhfYPos);
 
