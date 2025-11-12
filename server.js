@@ -29,14 +29,35 @@ app.use((req, res, next) => {
     next();
 });
 
-async function parseSolarXml() {
+const cacheInterval = 5 * 60 * 1000;
+let lastFetch = 0;
+let lastData = null;
+
+async function getSolarXml() {
     const xmlUrl = 'https://www.hamqsl.com/solarxml.php';
-    try {
-        const response = await fetch(xmlUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+
+    if (lastData == null || Date.now() - lastFetch > cacheInterval) {
+        try {
+            const response = await fetch(xmlUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const xmlData = await response.text();
+            console.log(`Refreshed data from ${xmlUrl} `);
+            lastData = xmlData;
+            lastFetch = Date.now();
+        } catch(error) {
+            console.error('Error parsing XML:', error);
+            throw error;
         }
-        const xmlData = await response.text();
+    }
+
+    return lastData;
+}
+
+async function parseSolarXml() {
+    try {        
+        const xmlData = await getSolarXml();
 
         const result = await new Promise((resolve, reject) => {
             xmlParser.parseString(xmlData, (err, parsedData) => {
@@ -88,7 +109,7 @@ async function parseSolarXml() {
         };
         return parsedJson;
     } catch (error) {
-        console.error('Error fetching or parsing XML:', error);
+        console.error('Error parsing XML:', error);
         throw error;
     }
 }
