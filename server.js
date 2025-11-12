@@ -3,7 +3,7 @@ const xml2js = require('xml2js');
 const { createCanvas, loadImage } = require('canvas');
 
 const app = express();
-const port = 3000;
+const port = 5000;
 
 const xmlParser = new xml2js.Parser();
 
@@ -77,54 +77,178 @@ async function renderSolarCanvas(data) {
     const canvas = createCanvas(width, height);
     const context = canvas.getContext('2d');
 
+    // Define colors
+    const colors = {
+        background: '#000000',
+        title: '#cccccc',
+        subtitle: '#aaaaaa',
+        text: '#ffffff',
+        separator: '#555555',
+        good: '#00ff00',
+        fair: '#ffff00',
+        poor: '#ff0000'
+    };
+
+    // Helper function to set fill style based on condition
+    const setConditionColor = (condition) => {
+        if (condition.toLowerCase().includes('good')) return colors.good;
+        if (condition.toLowerCase().includes('fair')) return colors.fair;
+        if (condition.toLowerCase().includes('poor')) return colors.poor;
+        if (condition.toLowerCase().includes('closed')) return colors.poor;
+        return colors.text;
+    };
+
     // Set background color
-    context.fillStyle = '#000000';
+    context.fillStyle = colors.background;
     context.fillRect(0, 0, width, height);
 
     // Set font styles
-    context.font = '16px Arial';
-    context.fillStyle = '#ffffff';
+    context.font = '22px Courier New';
+    context.fillStyle = colors.text;
 
     // Draw header
-    context.font = 'bold 20px Arial';
-    context.fillText('Solar Terrestrial Data — ' + new Date().toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', timeZoneName: 'short' }), 20, 40);
-    context.font = '16px Arial'; // Reset font
+    context.font = 'bold 24px Courier New';
+    context.fillStyle = colors.title;
+    context.fillText('Solar Terrestrial Data', 20, 40);
+
+    // Draw subtitle
+    context.font = '18px Courier New';
+    context.fillStyle = colors.subtitle;
+    context.fillText(new Date().toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', timeZoneName: 'short' }), 20, 70);
 
     // Draw separator line
-    context.strokeStyle = '#ffffff';
+    context.strokeStyle = colors.separator;
     context.lineWidth = 2;
     context.beginPath();
-    context.moveTo(20, 60);
-    context.lineTo(width - 20, 60);
+    context.moveTo(20, 85);
+    context.lineTo(width - 20, 85);
     context.stroke();
 
-    // Draw data rows
-    context.fillText(`SFI: ${data.solarflux}   Sunspots: ${data.sunspots}   X-Ray: ${data.xray}   Aurora: ${data.aurora}   Kp: ${data.kindex}`, 20, 90);
-    context.fillText(`Solar Wind: ${data.solarwind} km/s    Bz: ${data.magneticfield} nT   Proton Flux: ${data.protonflux}`, 20, 120);
-    context.fillText(`Geomagnetic Field: ${data.geomagfield}     Noise: ${data.signalnoise}`, 20, 150);
+    // Draw data rows in three columns
+    context.font = '20px Courier New';
+
+    const col1X = 20;
+    const col2X = 210;
+    const col3X = 600;
+
+    let yPos = 125;
+    
+    context.fillStyle = colors.subtitle;
+    context.fillText(`SFI: `, col1X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.solarflux}`, col1X + 60, yPos);
+    
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Sunspots: `, col2X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.sunspots}`, col2X + 120, yPos);
+
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Noise: `, col3X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.signalnoise}`, col3X + 90, yPos);
+    
+    yPos += 30;
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Kp: `, col1X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.kindex}`, col1X + 50, yPos);
+    
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Solar Wind: `, col2X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.solarwind} km/s`, col2X + 140, yPos);
+
+    context.fillStyle = colors.subtitle;
+    context.fillText(`X-Ray: `, col3X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.xray}`, col3X + 80, yPos);
+
+    yPos += 30;
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Aurora: `, col1X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.aurora}`, col1X + 100, yPos);
+
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Proton Flux: `, col2X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.protonflux}`, col2X + 160, yPos);
+
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Bz: `, col3X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.magneticfield} nT`, col3X + 50, yPos);
+    
+    yPos += 30;
+    context.fillStyle = colors.subtitle;
+    context.fillText(`Geomagnetic Field: `, col2X, yPos);
+    context.fillStyle = colors.text;
+    context.fillText(`${data.geomagfield}`, col2X + 230, yPos);
+
 
     // Draw separator line
     context.beginPath();
-    context.moveTo(20, 170);
-    context.lineTo(width - 20, 170);
+    context.moveTo(20, yPos + 25);
+    context.lineTo(width - 20, yPos + 25);
     context.stroke();
 
-    // Draw HF Band Conditions    
-    context.fillText('HF Band Conditions', 20, 200);
-    context.fillText('Day        Night', 20, 220);
-    let linePos = 240
+
+    yPos += 70;
+    // Draw HF Band Conditions
+    context.font = 'bold 22px Courier New';
+    context.fillStyle = colors.title;
+    context.fillText('HF Band Conditions', 20, yPos);
+
+    context.font = '20px Courier New';
+    context.fillStyle = colors.subtitle;
+    context.fillText('Band       Day       Night', 20, yPos + 30);
+
+    yPos += 60;
     Object.entries(data.calculatedconditions).forEach(([key, value]) => {
-        context.fillText(`${key}: ${value['day'] || 'N/A'}   ${value['night'] || 'N/A'}`, 20, linePos);
-        linePos += 20;
+        const dayCondition = value['day'] || 'N/A';
+        const nightCondition = value['night'] || 'N/A';
+        
+        context.fillStyle = colors.text;
+        context.fillText(`${key}:`, 20, yPos);
+        
+        context.fillStyle = setConditionColor(dayCondition);
+        context.fillText(dayCondition, 150, yPos);
+        
+        context.fillStyle = setConditionColor(nightCondition);
+        context.fillText(nightCondition, 270, yPos);
+
+        yPos += 35;
     });
-    
+
+    let vhfXPos = width / 2 + 80;
+    let vhfYPos = 285;
     // Draw VHF / EME Conditions
-    context.fillText('VHF / EME Conditions', width / 2 + 50, 200);
-    context.fillText('Aurora: ' + (data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A'), width / 2 + 50, 220);
-    context.fillText('6m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe_6m'] || 'N/A'), width / 2 + 50, 240);
-    context.fillText('4m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe_4m']  || 'N/A'), width / 2 + 50, 260);
-    context.fillText('2m EsEU: ' + (data.calculatedvhfconditions?.['E-Skip']?.['europe']  || 'N/A'), width / 2 + 50, 280);
-    context.fillText('2m EsNA: ' + (data.calculatedvhfconditions?.['E-Skip']?.['north_america']  || 'N/A'), width / 2 + 50, 300);
+    context.font = 'bold 22px Courier New';
+    context.fillStyle = colors.title;
+    context.fillText('VHF / EME Conditions', vhfXPos, vhfYPos);
+    
+    context.font = '20px Courier New';
+    vhfYPos += 30;
+
+
+    const vhfConditions = [
+        `Aurora:  ${data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A'}`,
+        `6m EsEU: ${data.calculatedvhfconditions?.['E-Skip']?.['europe_6m'] || 'N/A'}`,
+        `4m EsEU: ${data.calculatedvhfconditions?.['E-Skip']?.['europe_4m']  || 'N/A'}`,
+        `2m EsEU: ${data.calculatedvhfconditions?.['E-Skip']?.['europe']  || 'N/A'}`,
+        `2m EsNA: ${data.calculatedvhfconditions?.['E-Skip']?.['north_america']  || 'N/A'}`,
+    ];
+
+    vhfConditions.forEach(condition => {
+        const [label, value] = condition.split(':');
+        context.fillStyle = colors.subtitle;
+        context.fillText(label + ':', vhfXPos, vhfYPos);
+
+        context.fillStyle = setConditionColor(value);
+        context.fillText(value.trim(), vhfXPos + 120, vhfYPos);
+        vhfYPos += 34;
+    });
 
     return canvas.toBuffer('image/png');
 }
@@ -154,7 +278,7 @@ app.get('/solar/canvas', async (req, res) => {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Solar Terrestrial Data</title>
                 <style>
-                    body { background-color: #282c34; color: #ffffff; font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                    body { background-color: #282c34; color: #ffffff; font-family: Courier New, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
                     img { border: 2px solid #ffffff; }
                 </style>
             </head>
@@ -180,6 +304,10 @@ app.get('/solar/png', async (req, res) => {
         console.error('Error generating PNG:', error);
         res.status(500).send('Error generating solar data PNG.');
     }
+});
+
+app.get('/', (req, res) => {
+    res.redirect('/solar/canvas');
 });
 
 app.listen(port, () => {
