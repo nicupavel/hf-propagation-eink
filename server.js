@@ -4,8 +4,30 @@ const { createCanvas, loadImage } = require('canvas');
 
 const app = express();
 const port = 3000;
-
 const xmlParser = new xml2js.Parser();
+
+const defaultSettings = {
+    mode: 1,
+    invert: 0,
+    width: 800,
+    height: 480,
+    fontSizeNormal: 22,
+    fontSizeLarge: 24,
+};
+
+const settings = { ...defaultSettings };
+
+app.use((req, res, next) => {
+    const { mode, invert, width, height } = req.query;
+
+    // Set default values if not provided
+    settings.mode = mode === '0' || mode === '1' ? parseInt(mode) : defaultSettings.mode;
+    settings.invert = invert === '0' || invert === '1' ? parseInt(invert) : defaultSettings.invert;
+    settings.width = parseInt(width ?? defaultSettings.width);
+    settings.height = parseInt(height ?? defaultSettings.height);
+
+    next();
+});
 
 async function parseSolarXml() {
     const xmlUrl = 'https://www.hamqsl.com/solarxml.php';
@@ -72,28 +94,40 @@ async function parseSolarXml() {
 }
 
 // Render json data onto a canvas
-async function renderSolarCanvas(data, mode) {
-    const width = 800;
-    const height = 480;
-    const canvas = createCanvas(width, height);
+async function renderSolarCanvas(data) { // mode is now expected to be parsed from query params
+    const canvas = createCanvas(settings.width, settings.height);
     const context = canvas.getContext('2d');
 
-    mode = mode ?? 0;
-
     // Define colors
-    const colors = {
-        background: '#000000',
-        title: '#cccccc',
-        subtitle: '#aaaaaa',
-        text: '#ffffff',
-        separator: '#555555',
-        good: '#00ff00',
-        fair: '#ffff00',
-        poor: '#ff0000'
+    const theme = {
+        normal: {
+            background: '#000000',
+            title: '#cccccc',
+            subtitle: '#aaaaaa',
+            text: '#ffffff',
+            separator: '#555555',
+            good: '#00ff00',
+            fair: '#ffff00',
+            poor: '#ff0000'
+        },
+        invert: {
+            background: '#ffffff',
+            title: '#555',
+            subtitle: '#666',
+            text: '#000000',
+            separator: '#555555',
+            good: '#00ff00',
+            fair: '#ffff00',
+            poor: '#ff0000'
+        }        
     };
 
+    const colors = settings.invert ? theme.invert : theme.normal;
+    settings.fontSizeNormal = (defaultSettings.fontSizeNormal * settings.height) / defaultSettings.height;
+    settings.fontSizeLarge = (defaultSettings.fontSizeLarge * settings.height) / defaultSettings.height;
+
     const setConditionColor = (condition) => {
-        if (mode == 0 ) return colors.text;
+        if (settings.mode == 0 ) return colors.text;
 
         if (condition.toLowerCase().includes('good')) return colors.good;
         if (condition.toLowerCase().includes('fair')) return colors.fair;
@@ -104,14 +138,14 @@ async function renderSolarCanvas(data, mode) {
 
     // Set background color
     context.fillStyle = colors.background;
-    context.fillRect(0, 0, width, height);
+    context.fillRect(0, 0, settings.width, settings.height);
 
     // Set font styles
-    context.font = '22px Courier New';
+    context.font = `${settings.fontSizeNormal}px Courier New`;
     context.fillStyle = colors.text;
 
     // Draw header
-    context.font = 'bold 24px Courier New';
+    context.font = `bold ${settings.fontSizeLarge}px Courier New`;
     context.fillStyle = colors.title;
     context.fillText('Solar Terrestrial Data', 20, 40);
 
@@ -125,7 +159,7 @@ async function renderSolarCanvas(data, mode) {
     context.lineWidth = 2;
     context.beginPath();
     context.moveTo(20, 85);
-    context.lineTo(width - 20, 85);
+    context.lineTo(settings.width - 20, 85);
     context.stroke();
 
     // Draw data rows in three columns
@@ -194,7 +228,7 @@ async function renderSolarCanvas(data, mode) {
     // Draw separator line
     context.beginPath();
     context.moveTo(20, yPos + 25);
-    context.lineTo(width - 20, yPos + 25);
+    context.lineTo(settings.width - 20, yPos + 25);
     context.stroke();
 
 
@@ -225,7 +259,7 @@ async function renderSolarCanvas(data, mode) {
         yPos += 35;
     });
 
-    let vhfXPos = width / 2 + 80;
+    let vhfXPos = settings.width / 2 + 80;
     let vhfYPos = 285;
     // Draw VHF / EME Conditions
     context.font = 'bold 22px Courier New';
