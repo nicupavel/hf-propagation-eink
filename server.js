@@ -129,6 +129,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
             text: '#ffffff',
             separator: '#555555',
             good: '#00ff00',
+            green: '#00ff00',
             fair: '#ffff00',
             poor: '#ff0000'
         },
@@ -139,6 +140,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
             text: '#000000',
             separator: '#555555',
             good: '#00ff00',
+            green: '#000000',
             fair: '#ffff00',
             poor: '#ff0000'
         }        
@@ -195,20 +197,45 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
 
     let yPos = 125;
     
+    // --- SFI: Solar Flux Index (Black text on Green background) ---
     context.fillStyle = colors.subtitle;
     context.fillText(`SFI:`, col1X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.solarflux}`, col1X + 60, yPos);
     
+    let textWidth = context.measureText(`${data.solarflux}`).width;
+    let textX = col1X + 60;
+    let textY = yPos - settings.fontSizeNormal + 5;
+    let rectHeight = settings.fontSizeNormal + 5;
+    
+    context.fillStyle = colors.green;
+    context.fillRect(textX - 4, textY - 4, textWidth + 8, rectHeight);
+    context.fillStyle = colors.background;
+    context.fillText(`${data.solarflux}`, textX, yPos);
+    
+    // --- Sunspots (Black text on Green background) ---
     context.fillStyle = colors.subtitle;
     context.fillText(`Sunspots:`, col2X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.sunspots}`, col2X + 120, yPos);
 
+    textWidth = context.measureText(`${data.sunspots}`).width;
+    textX = col2X + 120;
+    
+    context.fillStyle = colors.green;
+    context.fillRect(textX - 4, textY - 4, textWidth + 8, rectHeight);
+    context.fillStyle = colors.background;
+    context.fillText(`${data.sunspots}`, textX, yPos);
+
+    // --- Signal Noise (Black text on Green background) ---
     context.fillStyle = colors.subtitle;
     context.fillText(`Sig Noise:`, col3X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.signalnoise}`, col3X + 130, yPos);
+
+    textWidth = context.measureText(`${data.signalnoise}`).width;
+    textX = col3X + 130;
+    
+    context.fillStyle = colors.green;
+    context.fillRect(textX - 4, textY - 4, textWidth + 8, rectHeight);
+    context.fillStyle = colors.background;
+    context.fillText(`${data.signalnoise}`, textX, yPos);
+    
+   
     
     yPos += 30;
     context.fillStyle = colors.subtitle;
@@ -277,18 +304,34 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     context.fillText('Band     Day   Night', 20, yPos + 30);
 
     yPos += 60;
+    function drawRightAlignedText(text, x, y, width) {
+        const textWidth = context.measureText(text).width;
+        context.fillText(text, x + width - textWidth, y);
+    }
+    
+    function drawCondition(condition, x, y, width ) {
+        const textWidth = context.measureText(condition).width;
+        
+        if (condition.toLowerCase().includes('good')) {
+            context.fillStyle = colors.green;
+            context.fillRect(x, y - settings.fontSizeNormal, width, settings.fontSizeNormal + 5);
+            context.fillStyle = colors.black;
+            drawRightAlignedText(condition, x, y, width);
+        } else {
+            context.fillStyle = setConditionColor(condition);
+            drawRightAlignedText(condition, x, y, width);
+        }
+    }
+
     Object.entries(data.calculatedconditions).forEach(([key, value]) => {
         const dayCondition = value['day'] || 'N/A';
         const nightCondition = value['night'] || 'N/A';
         
         context.fillStyle = colors.subtitle;
         context.fillText(`${key}:`, 20, yPos);
-        
-        context.fillStyle = setConditionColor(dayCondition);
-        context.fillText(dayCondition, 126, yPos);
-        
-        context.fillStyle = setConditionColor(nightCondition);
-        context.fillText(nightCondition, 198, yPos);
+
+        drawCondition(dayCondition, 96, yPos, 80);
+        drawCondition(nightCondition, 168, yPos, 80);
 
         yPos += 35;
     });
@@ -331,7 +374,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     return x + width;
 }
 
-    const LINE_HEIGHT = 30;
+    const LINE_HEIGHT = 32;
 
     // Set the initial positions
     let currentXPos = LasthfXPos;
