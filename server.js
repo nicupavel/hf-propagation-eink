@@ -314,8 +314,8 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
         
         if (condition.toLowerCase().includes('good')) {
             context.fillStyle = colors.green;
-            context.fillRect(x, y - settings.fontSizeNormal, width, settings.fontSizeNormal + 5);
-            context.fillStyle = colors.black;
+            context.fillRect(x + 26, y - settings.fontSizeNormal, width - 20, settings.fontSizeNormal + 10);
+            context.fillStyle = colors.background;
             drawRightAlignedText(condition, x, y, width);
         } else {
             context.fillStyle = setConditionColor(condition);
