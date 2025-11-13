@@ -14,6 +14,7 @@ const defaultSettings = {
     fontSizeSmall: 18,
     fontSizeNormal: 20,
     fontSizeLarge: 20,
+    LINE_SPACING_DEFAULT: 30, // Added for scalable line spacing
 };
 
 const settings = { ...defaultSettings };
@@ -130,7 +131,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
             separator: '#555555',
             good: '#00ff00',
             green: '#00ff00',
-            fair: '#ffff00',
+            fair: '#FFA500',
             poor: '#ff0000'
         },
         invert: {
@@ -141,7 +142,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
             separator: '#555555',
             good: '#00ff00',
             green: '#000000',
-            fair: '#ffff00',
+            fair: '#FFA500',
             poor: '#ff0000'
         }        
     };
@@ -150,6 +151,9 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     settings.fontSizeSmall = (defaultSettings.fontSizeSmall * settings.height) / defaultSettings.height;
     settings.fontSizeNormal = (defaultSettings.fontSizeNormal * settings.height) / defaultSettings.height;
     settings.fontSizeLarge = (defaultSettings.fontSizeLarge * settings.height) / defaultSettings.height;
+    
+    // Calculate scalable line spacing
+    const LINE_SPACING = (defaultSettings.LINE_SPACING_DEFAULT * settings.height) / defaultSettings.height;
 
     const setConditionColor = (condition) => {
         if (settings.mode == 0 ) return colors.text;
@@ -161,6 +165,15 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
         if (condition.toLowerCase().includes('closed')) return colors.poor;
          return colors.text;
     };
+    
+    // Determine the highlight color based ONLY on mode (Gray for mode=0, Green otherwise)
+    const highlightColor = settings.mode === 0 ? '#555555' : colors.green;
+    
+    // Determine the color for the text *inside* the highlighted boxes
+    // FIX: When mode=0, force pure white (#ffffff) to ensure high contrast against the gray highlight, regardless of invert status.
+    // When mode=1, use the canvas background color (which is already set for contrast against the colored highlight).
+    const highlightTextColor = settings.mode === 0 ? '#ffffff' : colors.background;
+
 
     // Set background color
     context.fillStyle = colors.background;
@@ -176,7 +189,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     context.fillText('Solar Terrestrial Data', 20, 40);
 
     // Draw subtitle
-    context.font = '${settings.fontSizeSmall}px Courier New';
+    context.font = `${settings.fontSizeSmall}px Courier New`;
     context.fillStyle = colors.subtitle;
     context.fillText(new Date().toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', timeZoneName: 'short' }), 20, 70);
 
@@ -189,7 +202,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     context.stroke();
 
     // Draw data rows in three columns
-    context.font = '${settings.fontSizeNormal}px Courier New';
+    context.font = `${settings.fontSizeNormal}px Courier New`;
 
     const col1X = 20;
     const col2X = 210;
@@ -197,7 +210,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
 
     let yPos = 125;
     
-    // --- SFI: Solar Flux Index (Black text on Green background) ---
+    // --- SFI: Solar Flux Index (Text on conditional background) ---
     context.fillStyle = colors.subtitle;
     context.fillText(`SFI:`, col1X, yPos);
     
@@ -206,38 +219,38 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     let textY = yPos - settings.fontSizeNormal + 5;
     let rectHeight = settings.fontSizeNormal + 5;
     
-    context.fillStyle = colors.green;
+    context.fillStyle = highlightColor; // Uses conditional highlight color (#555555 if mode=0)
     context.fillRect(textX - 4, textY - 4, textWidth + 8, rectHeight);
-    context.fillStyle = colors.background;
+    context.fillStyle = highlightTextColor; // Uses conditional text color (#ffffff if mode=0)
     context.fillText(`${data.solarflux}`, textX, yPos);
     
-    // --- Sunspots (Black text on Green background) ---
+    // --- Sunspots (Text on conditional background) ---
     context.fillStyle = colors.subtitle;
     context.fillText(`Sunspots:`, col2X, yPos);
 
     textWidth = context.measureText(`${data.sunspots}`).width;
     textX = col2X + 120;
     
-    context.fillStyle = colors.green;
+    context.fillStyle = highlightColor; // Uses conditional highlight color
     context.fillRect(textX - 4, textY - 4, textWidth + 8, rectHeight);
-    context.fillStyle = colors.background;
+    context.fillStyle = highlightTextColor; // Uses conditional text color
     context.fillText(`${data.sunspots}`, textX, yPos);
 
-    // --- Signal Noise (Black text on Green background) ---
+    // --- Signal Noise (Text on conditional background) ---
     context.fillStyle = colors.subtitle;
     context.fillText(`Sig Noise:`, col3X, yPos);
 
     textWidth = context.measureText(`${data.signalnoise}`).width;
     textX = col3X + 130;
     
-    context.fillStyle = colors.green;
+    context.fillStyle = highlightColor; // Uses conditional highlight color
     context.fillRect(textX - 4, textY - 4, textWidth + 8, rectHeight);
-    context.fillStyle = colors.background;
+    context.fillStyle = highlightTextColor; // Uses conditional text color
     context.fillText(`${data.signalnoise}`, textX, yPos);
     
    
     
-    yPos += 30;
+    yPos += LINE_SPACING; // Using scalable LINE_SPACING
     context.fillStyle = colors.subtitle;
     context.fillText(`K Index:`, col1X, yPos);
     context.fillStyle = colors.text;
@@ -253,7 +266,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     context.fillStyle = colors.text;
     context.fillText(`${data.xray}`, col3X + 80, yPos);
 
-    yPos += 30;
+    yPos += LINE_SPACING; // Using scalable LINE_SPACING
     context.fillStyle = colors.subtitle;
     context.fillText(`Aurora:`, col1X, yPos);
     context.fillStyle = colors.text;
@@ -269,7 +282,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     context.fillStyle = colors.text;
     context.fillText(`${data.heliumline}`, col3X + 150, yPos);
     
-    yPos += 30;
+    yPos += LINE_SPACING; // Using scalable LINE_SPACING
     context.fillStyle = colors.subtitle;
     context.fillText(`Mag Fld:`, col1X, yPos);
     context.fillStyle = colors.text;
@@ -288,22 +301,23 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
 
     // Draw separator line
     context.beginPath();
-    context.moveTo(20, yPos + 25);
-    context.lineTo(settings.width - 20, yPos + 25);
+    context.moveTo(20, yPos + LINE_SPACING * 0.83);
+    context.lineTo(settings.width - 20, yPos + LINE_SPACING * 0.83);
     context.stroke();
 
 
-    yPos += 70;
+    yPos += LINE_SPACING * 2.33; 
     // Draw HF Band Conditions
-    context.font = 'bold ${settings.fontSizeLarge}px Courier New';
+    context.font = `bold ${settings.fontSizeLarge}px Courier New`;
     context.fillStyle = colors.title;
     context.fillText('HF Band Conditions', 20, yPos);
 
-    context.font = '${settings.fontSizeNormal}px Courier New';
+    context.font = `${settings.fontSizeNormal}px Courier New`;
     context.fillStyle = colors.subtitle;
-    context.fillText('Band     Day   Night', 20, yPos + 30);
+    yPos += LINE_SPACING; // Using scalable LINE_SPACING
+    context.fillText('Band     Day   Night', 20, yPos);
 
-    yPos += 60;
+    yPos += LINE_SPACING; 
     function drawRightAlignedText(text, x, y, width) {
         const textWidth = context.measureText(text).width;
         context.fillText(text, x + width - textWidth, y);
@@ -312,12 +326,19 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     function drawCondition(condition, x, y, width ) {
         const textWidth = context.measureText(condition).width;
         
+        // Corrected check for 'good' condition
         if (condition.toLowerCase().includes('good')) {
-            context.fillStyle = colors.green;
-            context.fillRect(x + 26, y - settings.fontSizeNormal, width - 20, settings.fontSizeNormal + 10);
-            context.fillStyle = colors.background;
+            // Use the gray highlight color if mode=0
+            const conditionHighlightColor = settings.mode === 0 ? '#555555' : colors.green;
+            
+            context.fillStyle = conditionHighlightColor; 
+            context.fillRect(x + 26, y - settings.fontSizeNormal, width - 20, settings.fontSizeNormal + 10); 
+            
+            // Set text color to the contrasting highlightTextColor
+            context.fillStyle = highlightTextColor; // <-- FIX: Uses white when mode=0
             drawRightAlignedText(condition, x, y, width);
         } else {
+            // For Fair/Poor/N/A, rely on setConditionColor
             context.fillStyle = setConditionColor(condition);
             drawRightAlignedText(condition, x, y, width);
         }
@@ -333,18 +354,18 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
         drawCondition(dayCondition, 96, yPos, 80);
         drawCondition(nightCondition, 168, yPos, 80);
 
-        yPos += 35;
+        yPos += LINE_SPACING * 1.16; // Using scalable LINE_SPACING
     });
 
     let vhfXPos = settings.width / 2 - 100;
     let vhfYPos = 285;
     // Draw VHF / EME Conditions
-    context.font = 'bold ${settings.fontSizeLarge}px Courier New';
+    context.font = `bold ${settings.fontSizeLarge}px Courier New`;
     context.fillStyle = colors.title;
     context.fillText('VHF / EME Conditions', vhfXPos, vhfYPos);
     
-    context.font = '${settings.fontSizeNormal}px Courier New';
-    vhfYPos += 30;
+    context.font = `${settings.fontSizeNormal}px Courier New`;
+    vhfYPos += LINE_SPACING; // Using scalable LINE_SPACING
 
     const vhfConditions = [
         { 'Aurora':  data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A' },
@@ -359,9 +380,11 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
         context.fillStyle = colors.subtitle;
         context.fillText(label + ':', vhfXPos, vhfYPos);
 
+        // Note: This section does not use background rectangles, 
+        // it only changes text color, which is handled correctly by setConditionColor
         context.fillStyle = setConditionColor(value);
         context.fillText(value.trim(), vhfXPos + 120, vhfYPos);
-        vhfYPos += 34;
+        vhfYPos += LINE_SPACING * 1.13; // Using scalable LINE_SPACING
     });
 
     let LasthfXPos = settings.width / 2 + 180;
@@ -374,8 +397,6 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     return x + width;
 }
 
-    const LINE_HEIGHT = 32;
-
     // Set the initial positions
     let currentXPos = LasthfXPos;
     let currentYPos = LasthfYPos;
@@ -386,7 +407,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
 
     // --- START NEW LINE ---
     currentXPos = LasthfXPos;
-    currentYPos += LINE_HEIGHT; 
+    currentYPos += LINE_SPACING; // Using scalable LINE_SPACING
 
     // --- LINE 2: Norm ---
     currentXPos = drawSegment(context, 'Norm: ', colors.subtitle, currentXPos, currentYPos);
@@ -394,7 +415,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
 
     // --- START NEW LINE ---
     currentXPos = LasthfXPos;
-    currentYPos += LINE_HEIGHT; 
+    currentYPos += LINE_SPACING; // Using scalable LINE_SPACING
 
     // --- LINE 3: A Index ---
     currentXPos = drawSegment(context, 'A Index: ', colors.subtitle, currentXPos, currentYPos);
@@ -402,7 +423,7 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
 
     // --- START NEW LINE ---
     currentXPos = LasthfXPos;
-    currentYPos += LINE_HEIGHT; 
+    currentYPos += LINE_SPACING; // Using scalable LINE_SPACING
 
     // --- LINE 4: Elec Flx ---
     currentXPos = drawSegment(context, 'Elec Flx: ', colors.subtitle, currentXPos, currentYPos);
