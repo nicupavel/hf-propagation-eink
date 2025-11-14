@@ -34,18 +34,21 @@ const defaultSettings = {
     fontSizeNormal: 22,
     fontSizeLarge: 22,
     LINE_SPACING_DEFAULT: 30,
+    bw_mode: 0, // NEW: Black and White mode flag
 };
 
 const settings = { ...defaultSettings };
 
 app.use((req, res, next) => {
-    const { mode, invert, width, height } = req.query;
+    const { mode, invert, width, height, bw_mode } = req.query; // Capture bw_mode
 
     // Set default values if not provided
     settings.mode = mode === '0' || mode === '1' ? parseInt(mode) : defaultSettings.mode;
     settings.invert = invert === '0' || invert === '1' ? parseInt(invert) : defaultSettings.invert;
     settings.width = parseInt(width ?? defaultSettings.width);
     settings.height = parseInt(height ?? defaultSettings.height);
+    // NEW: Parse bw_mode
+    settings.bw_mode = bw_mode === '1' ? 1 : defaultSettings.bw_mode;
 
     next();
 });
@@ -161,10 +164,16 @@ async function renderSolarCanvas(data) {
         invert: {
             background: '#ffffff', title: '#555', subtitle: '#666', text: '#000000', separator: '#555555',
             good: '#00ff00', green: '#000000', fair: '#FFA500', poor: '#ff0000'
+        },
+        // NEW: Pure Black & White (B/W) theme definition
+        bw: {
+            background: '#ffffff', title: '#000000', subtitle: '#333333', text: '#000000', separator: '#bbbbbb',
+            good: '#000000', green: '#000000', fair: '#000000', poor: '#000000'
         }        
     };
 
-    const colors = settings.invert ? theme.invert : theme.normal;
+    // Choose the color scheme based on settings
+    const colors = settings.bw_mode === 1 ? theme.bw : (settings.invert ? theme.invert : theme.normal);
     
     const SCALE_FACTOR = settings.height / defaultSettings.height;
     
@@ -184,6 +193,8 @@ async function renderSolarCanvas(data) {
     }
 
     const setConditionColor = (condition) => {
+        if (settings.bw_mode === 1) return colors.text; // Text is black in B/W mode
+        
         if (settings.mode == 0 ) return colors.text;
 
         if (condition.toLowerCase().includes('good')) return colors.good;
@@ -205,12 +216,22 @@ async function renderSolarCanvas(data) {
         
         const textWidth = ctx.measureText(condition).width;
         
-        // --- NOTE: Condition cells are drawn right-aligned, which is good for numeric/comparative data. 
-        // For the header, we will use a different approach for left-alignment.
         const actualTextStartX = xColStart + width - textWidth; 
         
         if (condition.toLowerCase().includes('good')) {
-            const conditionHighlightColor = currentSettings.mode === 0 ? '#555555' : currentColors.good;
+            
+            let conditionHighlightColor;
+            let conditionHighlightTextColor;
+
+            if (currentSettings.bw_mode === 1) {
+                // B/W Mode: Highlight is Black, Text is White
+                conditionHighlightColor = '#000000';
+                conditionHighlightTextColor = '#ffffff';
+            } else {
+                // Standard Mode (Previous Logic): Highlight is Gray for mode=0, Green for mode=1
+                conditionHighlightColor = currentSettings.mode === 0 ? '#555555' : currentColors.good;
+                conditionHighlightTextColor = hTextColor; // Use inherited logic
+            }
             
             ctx.fillStyle = conditionHighlightColor; 
             
@@ -224,7 +245,7 @@ async function renderSolarCanvas(data) {
                 Math.round(rectHeight)
             ); 
             
-            ctx.fillStyle = hTextColor; 
+            ctx.fillStyle = conditionHighlightTextColor; 
         } else {
             ctx.fillStyle = setCondColor(condition);
         }
@@ -233,9 +254,21 @@ async function renderSolarCanvas(data) {
     }
     // --- End Helper Functions ---
 
+    // --- Highlight logic for the Top Data Blocks ---
+    let effectiveHighlightColor;
+    let effectiveHighlightTextColor;
 
-    const highlightColor = settings.mode === 0 ? '#555555' : colors.green;
-    const highlightTextColor = settings.mode === 0 ? '#ffffff' : colors.background;
+    if (settings.bw_mode === 1) {
+        effectiveHighlightColor = '#000000';
+        effectiveHighlightTextColor = '#ffffff';
+    } else {
+        effectiveHighlightColor = settings.mode === 0 ? '#555555' : colors.green;
+        // Text is pure white if mode=0, or canvas background color for contrast if mode=1
+        effectiveHighlightTextColor = settings.mode === 0 ? '#ffffff' : colors.background;
+    }
+
+    const highlightColor = effectiveHighlightColor;
+    const highlightTextColor = effectiveHighlightTextColor;
 
 
     // Set background color
@@ -364,6 +397,8 @@ async function renderSolarCanvas(data) {
     });
 
     // Draw separator line (adjusted to account for the loop's final yPos increment)
+    context.strokeStyle = colors.separator;
+    context.lineWidth = Math.round(2 * SCALE_FACTOR);
     context.beginPath();
     context.moveTo(BASE_PADDING, Math.round(yPos - LINE_SPACING + LINE_SPACING * 0.83));
     context.lineTo(settings.width - BASE_PADDING, Math.round(yPos - LINE_SPACING + LINE_SPACING * 0.83));
@@ -405,6 +440,7 @@ async function renderSolarCanvas(data) {
         context.fillStyle = colors.subtitle;
         context.fillText(`${key}:`, BASE_PADDING, yPos);
 
+        // Uses the fixed highlightTextColor
         drawConditionCell(dayCondition, HF_DAY_X - 20, yPos, HF_BAND_WIDTH, context, settings, colors, setConditionColor, highlightColor, highlightTextColor);
         drawConditionCell(nightCondition, HF_NIGHT_X - 30, yPos, HF_BAND_WIDTH, context, settings, colors, setConditionColor, highlightColor, highlightTextColor);
 
@@ -455,6 +491,8 @@ async function renderSolarCanvas(data) {
     ];
 
     let currentYPos = LasthfYPos;
+
+    context.font = `bold ${settings.fontSizeNormal}px ${FONT_FAMILY}`; // Use custom font
 
     lineData.forEach(line => {
         let currentXPos = LasthfXPos;
