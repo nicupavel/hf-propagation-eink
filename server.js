@@ -1,20 +1,39 @@
 const express = require('express');
 const xml2js = require('xml2js');
-const { createCanvas, loadImage } = require('canvas');
+const { createCanvas, loadImage, registerFont } = require('canvas');
+const fetch = require('node-fetch');
+const path = require('path');
 
 const app = express();
 const port = 3000;
 const xmlParser = new xml2js.Parser();
+
+// --- GLOBAL CONSTANT FIX ---
+const FONT_FAMILY = 'Ubuntu Mono';
+// ---------------------------
+
+// --- REGISTER CUSTOM FONT ---
+// Ensure you have an 'assets' folder in your project root with 'UbuntuMono-Bold.ttf'
+try {
+    const fontPath = path.join(__dirname, 'assets', 'UbuntuMono-Bold.ttf');
+    registerFont(fontPath, { family: FONT_FAMILY });
+    console.log(`Registered font: ${FONT_FAMILY}`);
+} catch (error) {
+    // Fallback to a system monospace font if registration fails
+    console.warn("Could not register Ubuntu Mono font. Falling back to monospace.");
+    console.error(error.message);
+}
+// ----------------------------
 
 const defaultSettings = {
     mode: 1,
     invert: 0,
     width: 800,
     height: 480,
-    fontSizeSmall: 18,
-    fontSizeNormal: 20,
-    fontSizeLarge: 20,
-    LINE_SPACING_DEFAULT: 30, // Added for scalable line spacing
+    fontSizeSmall: 20,
+    fontSizeNormal: 22,
+    fontSizeLarge: 22,
+    LINE_SPACING_DEFAULT: 30,
 };
 
 const settings = { ...defaultSettings };
@@ -49,8 +68,11 @@ async function getSolarXml() {
             lastData = xmlData;
             lastFetch = Date.now();
         } catch(error) {
-            console.error('Error parsing XML:', error);
-            throw error;
+            console.error('Error fetching XML:', error);
+            if (lastData === null) {
+                throw error;
+            }
+            console.log('Using stale data due to fetch error.');
         }
     }
 
@@ -72,42 +94,51 @@ async function parseSolarXml() {
         });
 
         const solardata = result.solar.solardata[0];
+        
+        const safeParse = (arr, type = 'string') => {
+            if (!arr || arr.length === 0) return 'N/A';
+            const val = arr[0];
+            if (type === 'int') return parseInt(val, 10);
+            if (type === 'float') return parseFloat(val);
+            return val;
+        };
+
         const parsedJson = {
-            source: solardata.source[0]._,
-            updated: solardata.updated[0],
-            solarflux: parseInt(solardata.solarflux[0], 10),
-            aindex: parseInt(solardata.aindex[0], 10),
-            kindex: parseInt(solardata.kindex[0], 10),
-            kindexnt: solardata.kindexnt[0],
-            xray: solardata.xray[0],
-            sunspots: parseInt(solardata.sunspots[0], 10),
-            heliumline: parseFloat(solardata.heliumline[0]),
-            protonflux: parseInt(solardata.protonflux[0], 10),
-            electonflux: parseInt(solardata.electonflux[0], 10),
-            aurora: parseInt(solardata.aurora[0], 10),
-            normalization: parseFloat(solardata.normalization[0]),
-            latdegree: parseFloat(solardata.latdegree[0]),
-            solarwind: parseFloat(solardata.solarwind[0]),
-            magneticfield: parseFloat(solardata.magneticfield[0]),
-            geomagfield: solardata.geomagfield[0],
-            signalnoise: solardata.signalnoise[0],
-            fof2: solardata.fof2[0],
-            muf: solardata.muf[0],
-            muffactor: solardata.muffactor[0],
-            calculatedconditions: solardata.calculatedconditions[0].band.reduce(
+            source: safeParse(solardata.source),
+            updated: safeParse(solardata.updated),
+            solarflux: safeParse(solardata.solarflux, 'int'),
+            aindex: safeParse(solardata.aindex, 'int'),
+            kindex: safeParse(solardata.kindex, 'int'),
+            kindexnt: safeParse(solardata.kindexnt),
+            xray: safeParse(solardata.xray),
+            sunspots: safeParse(solardata.sunspots, 'int'),
+            heliumline: safeParse(solardata.heliumline, 'float'),
+            protonflux: safeParse(solardata.protonflux, 'int'),
+            electonflux: safeParse(solardata.electonflux, 'int'),
+            aurora: safeParse(solardata.aurora, 'int'),
+            normalization: safeParse(solardata.normalization, 'float'),
+            latdegree: safeParse(solardata.latdegree, 'float'),
+            solarwind: safeParse(solardata.solarwind, 'float'),
+            magneticfield: safeParse(solardata.magneticfield, 'float'),
+            geomagfield: safeParse(solardata.geomagfield),
+            signalnoise: safeParse(solardata.signalnoise),
+            fof2: safeParse(solardata.fof2),
+            muf: safeParse(solardata.muf),
+            muffactor: safeParse(solardata.muffactor),
+            calculatedconditions: solardata.calculatedconditions?.[0]?.band?.reduce(
                 (acc, { _, $: { name, time } }) => {
                     acc[name] = acc[name] || {};
                     acc[name][time] = _;
                     return acc;
                     }, {}
-                ),
-           calculatedvhfconditions: solardata.calculatedvhfconditions[0].phenomenon.reduce(
+                ) || {},
+           calculatedvhfconditions: solardata.calculatedvhfconditions?.[0]?.phenomenon?.reduce(
                 (acc, { _, $: { name, location } }) => {
                     acc[name] = acc[name] || {};
                     acc[name][location] = _;
                     return acc;
                 }, {}
-           ),
+           ) || {},
         };
         return parsedJson;
     } catch (error) {
@@ -116,44 +147,41 @@ async function parseSolarXml() {
     }
 }
 
-// Render json data onto a canvas
-async function renderSolarCanvas(data) { // mode is now expected to be parsed from query params
+
+async function renderSolarCanvas(data) {
     const canvas = createCanvas(settings.width, settings.height);
     const context = canvas.getContext('2d');
-
+    
     // Define colors
     const theme = {
         normal: {
-            background: '#000000',
-            title: '#cccccc',
-            subtitle: '#aaaaaa',
-            text: '#ffffff',
-            separator: '#555555',
-            good: '#00ff00',
-            green: '#00ff00',
-            fair: '#FFA500',
-            poor: '#ff0000'
+            background: '#000000', title: '#cccccc', subtitle: '#aaaaaa', text: '#ffffff', separator: '#555555',
+            good: '#00ff00', green: '#00ff00', fair: '#FFA500', poor: '#ff0000'
         },
         invert: {
-            background: '#ffffff',
-            title: '#555',
-            subtitle: '#666',
-            text: '#000000',
-            separator: '#555555',
-            good: '#00ff00',
-            green: '#000000',
-            fair: '#FFA500',
-            poor: '#ff0000'
+            background: '#ffffff', title: '#555', subtitle: '#666', text: '#000000', separator: '#555555',
+            good: '#00ff00', green: '#000000', fair: '#FFA500', poor: '#ff0000'
         }        
     };
 
     const colors = settings.invert ? theme.invert : theme.normal;
-    settings.fontSizeSmall = (defaultSettings.fontSizeSmall * settings.height) / defaultSettings.height;
-    settings.fontSizeNormal = (defaultSettings.fontSizeNormal * settings.height) / defaultSettings.height;
-    settings.fontSizeLarge = (defaultSettings.fontSizeLarge * settings.height) / defaultSettings.height;
     
-    // Calculate scalable line spacing
-    const LINE_SPACING = (defaultSettings.LINE_SPACING_DEFAULT * settings.height) / defaultSettings.height;
+    const SCALE_FACTOR = settings.height / defaultSettings.height;
+    
+    settings.fontSizeSmall = Math.round(defaultSettings.fontSizeSmall * SCALE_FACTOR);
+    settings.fontSizeNormal = Math.round(defaultSettings.fontSizeNormal * SCALE_FACTOR);
+    settings.fontSizeLarge = Math.round(defaultSettings.fontSizeLarge * SCALE_FACTOR);
+    
+    const LINE_SPACING = Math.round(defaultSettings.LINE_SPACING_DEFAULT * SCALE_FACTOR);
+
+    // --- Helper Functions for Drawing ---
+    
+    function drawSegment(ctx, text, color, x, y) {
+        ctx.fillStyle = color;
+        ctx.fillText(text, Math.round(x), Math.round(y));
+        const width = ctx.measureText(text).width;
+        return x + width;
+    }
 
     const setConditionColor = (condition) => {
         if (settings.mode == 0 ) return colors.text;
@@ -165,13 +193,48 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
         if (condition.toLowerCase().includes('closed')) return colors.poor;
          return colors.text;
     };
+
+    function drawRightAlignedText(text, xColStart, y, width, ctx) {
+        const textWidth = ctx.measureText(text).width;
+        ctx.fillText(text, Math.round(xColStart + width - textWidth), Math.round(y));
+    }
     
-    // Determine the highlight color based ONLY on mode (Gray for mode=0, Green otherwise)
+    function drawConditionCell(condition, xColStart, y, width, ctx, currentSettings, currentColors, setCondColor, hColor, hTextColor) {
+        const rectHeight = currentSettings.fontSizeNormal + Math.round(5 * SCALE_FACTOR); 
+        const paddingX = Math.round(4 * SCALE_FACTOR);
+        
+        const textWidth = ctx.measureText(condition).width;
+        
+        // --- NOTE: Condition cells are drawn right-aligned, which is good for numeric/comparative data. 
+        // For the header, we will use a different approach for left-alignment.
+        const actualTextStartX = xColStart + width - textWidth; 
+        
+        if (condition.toLowerCase().includes('good')) {
+            const conditionHighlightColor = currentSettings.mode === 0 ? '#555555' : currentColors.good;
+            
+            ctx.fillStyle = conditionHighlightColor; 
+            
+            // Vertical alignment fix
+            const rectYStart = y - currentSettings.fontSizeNormal + Math.round(2 * SCALE_FACTOR);
+            
+            ctx.fillRect(
+                Math.round(actualTextStartX - paddingX),
+                Math.round(rectYStart),
+                Math.round(textWidth + 2 * paddingX),
+                Math.round(rectHeight)
+            ); 
+            
+            ctx.fillStyle = hTextColor; 
+        } else {
+            ctx.fillStyle = setCondColor(condition);
+        }
+        
+        drawRightAlignedText(condition, xColStart, y, width, ctx);
+    }
+    // --- End Helper Functions ---
+
+
     const highlightColor = settings.mode === 0 ? '#555555' : colors.green;
-    
-    // Determine the color for the text *inside* the highlighted boxes
-    // FIX: When mode=0, force pure white (#ffffff) to ensure high contrast against the gray highlight, regardless of invert status.
-    // When mode=1, use the canvas background color (which is already set for contrast against the colored highlight).
     const highlightTextColor = settings.mode === 0 ? '#ffffff' : colors.background;
 
 
@@ -180,254 +243,225 @@ async function renderSolarCanvas(data) { // mode is now expected to be parsed fr
     context.fillRect(0, 0, settings.width, settings.height);
 
     // Set font styles
-    context.font = `${settings.fontSizeNormal}px Courier New`;
+    context.font = `${settings.fontSizeNormal}px ${FONT_FAMILY}`; // Use custom font
     context.fillStyle = colors.text;
-
-    // Draw header
-    context.font = `bold ${settings.fontSizeLarge}px Courier New`;
+    
+    // --- Scale Initial X and Y positions ---
+    const BASE_PADDING = Math.round(20 * SCALE_FACTOR);
+    
+    // Draw header (X: 20, Y: 40)
+    context.font = `bold ${settings.fontSizeLarge}px ${FONT_FAMILY}`; // Use custom font
     context.fillStyle = colors.title;
-    context.fillText('Solar Terrestrial Data', 20, 40);
+    context.fillText('Solar Terrestrial Data', BASE_PADDING, Math.round(40 * SCALE_FACTOR));
 
-    // Draw subtitle
-    context.font = `${settings.fontSizeSmall}px Courier New`;
+    // Draw subtitle (X: 20, Y: 70)
+    context.font = `bold ${settings.fontSizeSmall}px ${FONT_FAMILY}`; // Use custom font
     context.fillStyle = colors.subtitle;
-    context.fillText(new Date().toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', timeZoneName: 'short' }), 20, 70);
+    context.fillText(new Date().toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', timeZoneName: 'short' }), BASE_PADDING, Math.round(70 * SCALE_FACTOR));
 
-    // Draw separator line
+    // Draw separator line (Y: 85)
     context.strokeStyle = colors.separator;
-    context.lineWidth = 2;
+    context.lineWidth = Math.round(2 * SCALE_FACTOR);
     context.beginPath();
-    context.moveTo(20, 85);
-    context.lineTo(settings.width - 20, 85);
+    context.moveTo(BASE_PADDING, Math.round(85 * SCALE_FACTOR));
+    context.lineTo(settings.width - BASE_PADDING, Math.round(85 * SCALE_FACTOR));
     context.stroke();
 
-    // Draw data rows in three columns
-    context.font = `${settings.fontSizeNormal}px Courier New`;
+    // Draw data rows in three columns (Top half)
+    context.font = `bold ${settings.fontSizeNormal}px ${FONT_FAMILY}`; // Use custom font
 
-    const col1X = 20;
-    const col2X = 210;
-    const col3X = 500;
+    // Scale X positions of columns
+    const col1X = BASE_PADDING;
+    const col2X = Math.round(210 * SCALE_FACTOR);
+    const col3X = Math.round(500 * SCALE_FACTOR);
 
-    let yPos = 125;
+    // Scale initial yPos
+    let yPos = Math.round(125 * SCALE_FACTOR);
     
-    // --- SFI: Solar Flux Index (Text on conditional background) ---
+    // --- Row 1: SFI, Sunspots, S/N Ratio (Custom Highlight Logic) ---
+    const SFI_OFFSET = Math.round(60 * SCALE_FACTOR);
+    const SUNSPOTS_OFFSET = Math.round(120 * SCALE_FACTOR);
+    const SNR_OFFSET = Math.round(130 * SCALE_FACTOR);
+    const RECT_HEIGHT_BASE = settings.fontSizeNormal + Math.round(5 * SCALE_FACTOR);
+    const RECT_Y_START_ROW1 = yPos - settings.fontSizeNormal + Math.round(5 * SCALE_FACTOR) - Math.round(4 * SCALE_FACTOR);
+    
+    // SFI
     context.fillStyle = colors.subtitle;
     context.fillText(`SFI:`, col1X, yPos);
     
     let textWidth = context.measureText(`${data.solarflux}`).width;
-    let textX = col1X + 60;
-    let textY = yPos - settings.fontSizeNormal + 5;
-    let rectHeight = settings.fontSizeNormal + 5;
+    let textX = col1X + SFI_OFFSET - 10;
     
-    context.fillStyle = highlightColor; // Uses conditional highlight color (#555555 if mode=0)
-    context.fillRect(textX - 4, textY - 4, textWidth + 8, rectHeight);
-    context.fillStyle = highlightTextColor; // Uses conditional text color (#ffffff if mode=0)
-    context.fillText(`${data.solarflux}`, textX, yPos);
+    context.fillStyle = highlightColor;
+    context.fillRect(Math.round(textX - 4 * SCALE_FACTOR), Math.round(RECT_Y_START_ROW1), Math.round(textWidth + 8 * SCALE_FACTOR), Math.round(RECT_HEIGHT_BASE));
+    context.fillStyle = highlightTextColor;
+    context.fillText(`${data.solarflux}`, Math.round(textX), yPos);
     
-    // --- Sunspots (Text on conditional background) ---
+    // Sunspots
     context.fillStyle = colors.subtitle;
     context.fillText(`Sunspots:`, col2X, yPos);
 
     textWidth = context.measureText(`${data.sunspots}`).width;
-    textX = col2X + 120;
+    textX = col2X + SUNSPOTS_OFFSET - 10;
     
-    context.fillStyle = highlightColor; // Uses conditional highlight color
-    context.fillRect(textX - 4, textY - 4, textWidth + 8, rectHeight);
-    context.fillStyle = highlightTextColor; // Uses conditional text color
-    context.fillText(`${data.sunspots}`, textX, yPos);
+    context.fillStyle = highlightColor;
+    context.fillRect(Math.round(textX - 4 * SCALE_FACTOR), Math.round(RECT_Y_START_ROW1), Math.round(textWidth + 8 * SCALE_FACTOR), Math.round(RECT_HEIGHT_BASE));
+    context.fillStyle = highlightTextColor;
+    context.fillText(`${data.sunspots}`, Math.round(textX), yPos);
 
-    // --- Signal Noise (Text on conditional background) ---
+    // Signal Noise
     context.fillStyle = colors.subtitle;
-    context.fillText(`Sig Noise:`, col3X, yPos);
+    context.fillText(`S/N Ratio:`, col3X, yPos);
 
     textWidth = context.measureText(`${data.signalnoise}`).width;
-    textX = col3X + 130;
+    textX = col3X + SNR_OFFSET - 10;
     
-    context.fillStyle = highlightColor; // Uses conditional highlight color
-    context.fillRect(textX - 4, textY - 4, textWidth + 8, rectHeight);
-    context.fillStyle = highlightTextColor; // Uses conditional text color
-    context.fillText(`${data.signalnoise}`, textX, yPos);
+    context.fillStyle = highlightColor;
+    context.fillRect(Math.round(textX - 4 * SCALE_FACTOR), Math.round(RECT_Y_START_ROW1), Math.round(textWidth + 8 * SCALE_FACTOR), Math.round(RECT_HEIGHT_BASE));
+    context.fillStyle = highlightTextColor;
+    context.fillText(`${data.signalnoise}`, Math.round(textX), yPos);
     
-   
+    // --- Declarative Data for Rows 2, 3, 4 ---
     
-    yPos += LINE_SPACING; // Using scalable LINE_SPACING
-    context.fillStyle = colors.subtitle;
-    context.fillText(`K Index:`, col1X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.kindex}`, col1X + 100, yPos);
+    const tableData = [
+        // Row 2
+        [
+            { label: 'K Index:', value: data.kindex, x: col1X, xOffset: Math.round(90 * SCALE_FACTOR) },
+            { label: 'Solar Wind:', value: `${data.solarwind} km/s`, x: col2X, xOffset: Math.round(130 * SCALE_FACTOR) },
+            { label: 'X-Ray:', value: data.xray, x: col3X, xOffset: Math.round(70 * SCALE_FACTOR) },
+        ],
+        // Row 3
+        [
+            { label: 'Aurora:', value: data.aurora, x: col1X, xOffset: Math.round(80 * SCALE_FACTOR) },
+            { label: 'Proton Flux:', value: data.protonflux, x: col2X, xOffset: Math.round(140 * SCALE_FACTOR) },
+            { label: 'Helium Line:', value: data.heliumline, x: col3X, xOffset: Math.round(140 * SCALE_FACTOR) },
+        ],
+        // Row 4
+        [
+            { label: 'Mag Fld:', value: data.magneticfield, x: col1X, xOffset: Math.round(90 * SCALE_FACTOR) },
+            { label: 'Geo Fld:', value: data.geomagfield, x: col2X, xOffset: Math.round(90 * SCALE_FACTOR) },
+            { label: 'Lat Deg:', value: data.latdegree, x: col3X, xOffset: Math.round(90 * SCALE_FACTOR) },
+        ]
+    ];
     
-    context.fillStyle = colors.subtitle;
-    context.fillText(`Solar Wind:`, col2X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.solarwind} km/s`, col2X + 140, yPos);
+    // Advance Y position to the start of the first looped row (Row 2)
+    yPos += LINE_SPACING;
 
-    context.fillStyle = colors.subtitle;
-    context.fillText(`X-Ray:`, col3X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.xray}`, col3X + 80, yPos);
+    // --- Loop to draw Rows 2, 3, and 4 ---
+    tableData.forEach(row => {
+        row.forEach(col => {
+            // Draw the label (e.g., "K Index:")
+            context.fillStyle = colors.subtitle;
+            context.fillText(col.label, col.x, yPos);
+            
+            // Draw the value (e.g., data.kindex)
+            context.fillStyle = colors.text;
+            context.fillText(col.value, Math.round(col.x + col.xOffset), yPos);
+        });
+        
+        // Advance to the next row
+        yPos += LINE_SPACING;
+    });
 
-    yPos += LINE_SPACING; // Using scalable LINE_SPACING
-    context.fillStyle = colors.subtitle;
-    context.fillText(`Aurora:`, col1X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.aurora}`, col1X + 100, yPos);
-
-    context.fillStyle = colors.subtitle;
-    context.fillText(`Proton Flux:`, col2X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.protonflux}`, col2X + 160, yPos);
-
-    context.fillStyle = colors.subtitle;
-    context.fillText(`Helium Line:`, col3X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.heliumline}`, col3X + 150, yPos);
-    
-    yPos += LINE_SPACING; // Using scalable LINE_SPACING
-    context.fillStyle = colors.subtitle;
-    context.fillText(`Mag Fld:`, col1X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.magneticfield}`, col1X + 100, yPos);
-
-    context.fillStyle = colors.subtitle;
-    context.fillText(`Geo Fld:`, col2X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.geomagfield}`, col2X + 110, yPos);
-
-    context.fillStyle = colors.subtitle;
-    context.fillText(`Lat Deg:`, col3X, yPos);
-    context.fillStyle = colors.text;
-    context.fillText(`${data.latdegree}`, col3X + 100, yPos);
-
-
-    // Draw separator line
+    // Draw separator line (adjusted to account for the loop's final yPos increment)
     context.beginPath();
-    context.moveTo(20, yPos + LINE_SPACING * 0.83);
-    context.lineTo(settings.width - 20, yPos + LINE_SPACING * 0.83);
+    context.moveTo(BASE_PADDING, Math.round(yPos - LINE_SPACING + LINE_SPACING * 0.83));
+    context.lineTo(settings.width - BASE_PADDING, Math.round(yPos - LINE_SPACING + LINE_SPACING * 0.83));
     context.stroke();
 
 
-    yPos += LINE_SPACING * 2.33; 
-    // Draw HF Band Conditions
-    context.font = `bold ${settings.fontSizeLarge}px Courier New`;
+    yPos = Math.round(yPos - LINE_SPACING + LINE_SPACING * 2.33); 
+    
+    // --- REFACTORED HF BAND CONDITIONS (LEFT COLUMN) ---
+    context.font = `bold ${settings.fontSizeLarge}px ${FONT_FAMILY}`; // Use custom font
     context.fillStyle = colors.title;
-    context.fillText('HF Band Conditions', 20, yPos);
+    context.fillText('HF Band Conditions', BASE_PADDING, yPos);
 
-    context.font = `${settings.fontSizeNormal}px Courier New`;
+    context.font = `bold ${settings.fontSizeNormal}px ${FONT_FAMILY}`; // Use custom font
     context.fillStyle = colors.subtitle;
-    yPos += LINE_SPACING; // Using scalable LINE_SPACING
-    context.fillText('Band     Day   Night', 20, yPos);
+    yPos += LINE_SPACING;
+
+    // Scale column positions and widths
+    const HF_DAY_X = Math.round(96 * SCALE_FACTOR);
+    const HF_NIGHT_X = Math.round(168 * SCALE_FACTOR);
+    const HF_BAND_WIDTH = Math.round(80 * SCALE_FACTOR);
+    
+    // --- ALIGNMENT FIX APPLIED HERE FOR LEFT ALIGNMENT ---
+    context.fillText('Band:', BASE_PADDING, yPos); // Draw 'Band:' label
+    
+    // Left-align 'Day' header to start exactly where the condition text starts (HF_DAY_X)
+    context.fillText('Day', HF_DAY_X + 16, yPos); 
+    
+    // Left-align 'Night' header to start exactly where the condition text starts (HF_NIGHT_X)
+    context.fillText('Night', HF_NIGHT_X + 2, yPos); 
+    // ----------------------------------------------------
 
     yPos += LINE_SPACING; 
-    function drawRightAlignedText(text, x, y, width) {
-        const textWidth = context.measureText(text).width;
-        context.fillText(text, x + width - textWidth, y);
-    }
     
-    function drawCondition(condition, x, y, width ) {
-        const textWidth = context.measureText(condition).width;
-        
-        // Corrected check for 'good' condition
-        if (condition.toLowerCase().includes('good')) {
-            // Use the gray highlight color if mode=0
-            const conditionHighlightColor = settings.mode === 0 ? '#555555' : colors.green;
-            
-            context.fillStyle = conditionHighlightColor; 
-            context.fillRect(x + 26, y - settings.fontSizeNormal, width - 20, settings.fontSizeNormal + 10); 
-            
-            // Set text color to the contrasting highlightTextColor
-            context.fillStyle = highlightTextColor; // <-- FIX: Uses white when mode=0
-            drawRightAlignedText(condition, x, y, width);
-        } else {
-            // For Fair/Poor/N/A, rely on setConditionColor
-            context.fillStyle = setConditionColor(condition);
-            drawRightAlignedText(condition, x, y, width);
-        }
-    }
-
     Object.entries(data.calculatedconditions).forEach(([key, value]) => {
         const dayCondition = value['day'] || 'N/A';
         const nightCondition = value['night'] || 'N/A';
         
         context.fillStyle = colors.subtitle;
-        context.fillText(`${key}:`, 20, yPos);
+        context.fillText(`${key}:`, BASE_PADDING, yPos);
 
-        drawCondition(dayCondition, 96, yPos, 80);
-        drawCondition(nightCondition, 168, yPos, 80);
+        drawConditionCell(dayCondition, HF_DAY_X - 20, yPos, HF_BAND_WIDTH, context, settings, colors, setConditionColor, highlightColor, highlightTextColor);
+        drawConditionCell(nightCondition, HF_NIGHT_X - 30, yPos, HF_BAND_WIDTH, context, settings, colors, setConditionColor, highlightColor, highlightTextColor);
 
-        yPos += LINE_SPACING * 1.16; // Using scalable LINE_SPACING
+        yPos += Math.round(LINE_SPACING * 1.16);
     });
 
-    let vhfXPos = settings.width / 2 - 100;
-    let vhfYPos = 285;
-    // Draw VHF / EME Conditions
-    context.font = `bold ${settings.fontSizeLarge}px Courier New`;
+    // --- REFACTORED VHF / EME CONDITIONS (MIDDLE COLUMN) ---
+    let vhfXPos = Math.round(settings.width / 2 - 100 * SCALE_FACTOR);
+    let vhfYPos = Math.round(285 * SCALE_FACTOR);
+    
+    context.font = `bold ${settings.fontSizeLarge}px ${FONT_FAMILY}`; // Use custom font
     context.fillStyle = colors.title;
     context.fillText('VHF / EME Conditions', vhfXPos, vhfYPos);
     
-    context.font = `${settings.fontSizeNormal}px Courier New`;
-    vhfYPos += LINE_SPACING; // Using scalable LINE_SPACING
+    context.font = `bold ${settings.fontSizeNormal}px ${FONT_FAMILY}`; // Use custom font
+    vhfYPos += LINE_SPACING;
 
+    const VHF_OFFSET = Math.round(90 * SCALE_FACTOR);
+    
+    // Declarative array for VHF conditions
     const vhfConditions = [
-        { 'Aurora':  data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A' },
-        { '6m EsEU': data.calculatedvhfconditions?.['E-Skip']?.['europe_6m'] || 'N/A' },
-        { '4m EsEU': data.calculatedvhfconditions?.['E-Skip']?.['europe_4m']  || 'N/A'},
-        { '2m EsEU': data.calculatedvhfconditions?.['E-Skip']?.['europe']  || 'N/A' },
-        { '2m EsNA': data.calculatedvhfconditions?.['E-Skip']?.['north_america']  || 'N/A' },
+        { label: 'Aurora:', value: data.calculatedvhfconditions?.['vhf-aurora']?.['northern_hemi'] || 'N/A' },
+        { label: '6m EsEU:', value: data.calculatedvhfconditions?.['E-Skip']?.['europe_6m'] || 'N/A' },
+        { label: '4m EsEU:', value: data.calculatedvhfconditions?.['E-Skip']?.['europe_4m']  || 'N/A'},
+        { label: '2m EsEU:', value: data.calculatedvhfconditions?.['E-Skip']?.['europe']  || 'N/A' },
+        { label: '2m EsNA:', value: data.calculatedvhfconditions?.['E-Skip']?.['north_america']  || 'N/A' },
     ];
 
     vhfConditions.forEach(condition => {
-        const [[label, value]] = Object.entries(condition);
         context.fillStyle = colors.subtitle;
-        context.fillText(label + ':', vhfXPos, vhfYPos);
+        context.fillText(condition.label, vhfXPos, vhfYPos);
 
-        // Note: This section does not use background rectangles, 
-        // it only changes text color, which is handled correctly by setConditionColor
-        context.fillStyle = setConditionColor(value);
-        context.fillText(value.trim(), vhfXPos + 120, vhfYPos);
-        vhfYPos += LINE_SPACING * 1.13; // Using scalable LINE_SPACING
+        context.fillStyle = setConditionColor(condition.value);
+        context.fillText(condition.value.trim(), vhfXPos + VHF_OFFSET, vhfYPos);
+        
+        vhfYPos += Math.round(LINE_SPACING * 1.13);
     });
 
-    let LasthfXPos = settings.width / 2 + 180;
-    let LasthfYPos = 285;
+    // --- REFACTORED MUTLI-LINE DATA DRAWING (RIGHT COLUMN) ---
+    let LasthfXPos = Math.round(settings.width / 2 + 160 * SCALE_FACTOR);
+    let LasthfYPos = Math.round(315 * SCALE_FACTOR);
 
-    function drawSegment(ctx, text, color, x, y) {
-    ctx.fillStyle = color;
-    ctx.fillText(text, x, y);
-    const width = ctx.measureText(text).width;
-    return x + width;
-}
+    const lineData = [
+        { label: 'MUF: ', value: data.muf },
+        { label: 'Norm: ', value: data.normalization },
+        { label: 'A Index: ', value: data.aindex },
+        { label: 'Elec Flux: ', value: data.electonflux },
+    ];
 
-    // Set the initial positions
-    let currentXPos = LasthfXPos;
     let currentYPos = LasthfYPos;
 
-    // --- LINE 1: MUF ---
-    currentXPos = drawSegment(context, 'MUF: ', colors.subtitle, currentXPos, currentYPos);
-    currentXPos = drawSegment(context, `${data.muf}`, colors.text, currentXPos, currentYPos);
-
-    // --- START NEW LINE ---
-    currentXPos = LasthfXPos;
-    currentYPos += LINE_SPACING; // Using scalable LINE_SPACING
-
-    // --- LINE 2: Norm ---
-    currentXPos = drawSegment(context, 'Norm: ', colors.subtitle, currentXPos, currentYPos);
-    currentXPos = drawSegment(context, `${data.normalization}`, colors.text, currentXPos, currentYPos);
-
-    // --- START NEW LINE ---
-    currentXPos = LasthfXPos;
-    currentYPos += LINE_SPACING; // Using scalable LINE_SPACING
-
-    // --- LINE 3: A Index ---
-    currentXPos = drawSegment(context, 'A Index: ', colors.subtitle, currentXPos, currentYPos);
-    currentXPos = drawSegment(context, `${data.aindex}`, colors.text, currentXPos, currentYPos);
-
-    // --- START NEW LINE ---
-    currentXPos = LasthfXPos;
-    currentYPos += LINE_SPACING; // Using scalable LINE_SPACING
-
-    // --- LINE 4: Elec Flx ---
-    currentXPos = drawSegment(context, 'Elec Flx: ', colors.subtitle, currentXPos, currentYPos);
-    currentXPos = drawSegment(context, `${data.electonflux}`, colors.text, currentXPos, currentYPos);
+    lineData.forEach(line => {
+        let currentXPos = LasthfXPos;
+        currentXPos = drawSegment(context, line.label, colors.subtitle, currentXPos, currentYPos);
+        currentXPos = drawSegment(context, `${line.value}`, colors.text, currentXPos, currentYPos);
+        currentYPos += LINE_SPACING + 3;
+    });
 
     return canvas.toBuffer('image/png');
 }
@@ -457,7 +491,7 @@ app.get('/solar/canvas', async (req, res) => {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Solar Terrestrial Data</title>
                 <style>
-                    body { background-color: #282c34; color: #ffffff; font-family: Courier New, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                    body { background-color: #282c34; color: #ffffff; font-family: ${FONT_FAMILY}, monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
                     img { border: 2px solid #ffffff; }
                 </style>
             </head>
